@@ -18,8 +18,9 @@ class ReplayBuffer(object): #need different replaybuffers for different streets
         if n >= len(self.buffer):
             return self.buffer
         else:
-            numbers_to_grab = [random.randrange(0,n) for z in range(n)]
-            return [self.buffer[number] for number in numbers_to_grab]
+            b = copy.deepcopy(self.buffer)
+            random.shuffle(b)
+            return self.buffer[:n]
         
 class Event(object):
     def __init__(self,state0, features0, action, reward,state1,features1, player_index):
@@ -37,7 +38,6 @@ class Event(object):
     
 class DQN(object): #Implements Double DQN, with the slow-moving copy of the network instead of two separately trained ones. This is fine.
     def __init__(self, dim, u, name):
-
         self.sess = tf.Session()
         self.name = name
 
@@ -51,7 +51,7 @@ class DQN(object): #Implements Double DQN, with the slow-moving copy of the netw
             else:
                 self.L.append(tf.layers.dense(inputs = self.L[index-1], units = unit, activation = tf.nn.relu, name = "L"+str(index)+str(name)))
                 self.T.append(tf.layers.dense(inputs = self.T[index-1], units = unit, activation = tf.nn.relu, name = "T"+str(index)+str(name)))
-        
+
         self.Qout = tf.layers.dense(inputs = self.L[len(self.L)-1], units = 3,name = "Qout"+str(name)) #fold, call/check, raise to n
 
         self.TQout = tf.layers.dense(inputs = self.L[len(self.L)-1], units = 3,name = "TQout"+str(name))
@@ -59,19 +59,16 @@ class DQN(object): #Implements Double DQN, with the slow-moving copy of the netw
         self.saver = tf.train.Saver()
         self.target_Q = tf.placeholder(tf.float32)
         self.loss = (self.target_Q - self.Qout)**2
-
-
-                                    
-        self.opt = tf.train.RMSPropOptimizer(0.00001).minimize(self.loss)
+            
+        self.opt =  tf.train.RMSPropOptimizer(0.000005).minimize(self.loss)
         
         self.sess.run(tf.global_variables_initializer())
         
         self.update_target_network()
-  #      tf.get_default_graph().finalize()
+
 
     def update(self,event,gamma,after_network): #Uses target Q network.
-    #    print(tf.get_default_graph().version)    
-    #    print("dqn: nodes" + str(len([n.name for n in tf.get_default_graph().as_graph_def().node])))
+        
         state_before = event.state0 #states
         state_after = event.state1
         player_index = event.player_index
@@ -111,8 +108,6 @@ class DQN(object): #Implements Double DQN, with the slow-moving copy of the netw
             return self.sess.run(tf.get_variable("kernel")), self.sess.run(tf.get_variable("bias"))
 
     def update_target_network(self): #IT WORKS, I THINK.
-
-        print("dqn: updating target network")
         Ls = []
         for index in range(len(self.L)):
             Ls.append(self.get_weights_and_biases("L"+str(index)+str(self.name)))
@@ -122,15 +117,16 @@ class DQN(object): #Implements Double DQN, with the slow-moving copy of the netw
         old_weights = Ls+[Qout]
         
         names = ["T" + str(n) + str(self.name) for n in range(len(self.L))] +["TQout" + str(self.name)]
-
-
+    
         for index,scope in enumerate(names):
             with tf.variable_scope(scope,reuse=True):
                 k = tf.get_variable("kernel")
                 b = tf.get_variable("bias")
-
-                k.load(old_weights[index][0],self.sess)
-                b.load(old_weights[index][1],self.sess)
+                
+                assignment_k = k.assign(old_weights[index][0])
+                assignment_b = b.assign(old_weights[index][1])
+                self.sess.run(assignment_k)
+                self.sess.run(assignment_b)
                 
     def upload_original_network(self,weights):
         names =  ["L" + str(n) + str(self.name) for n in range(len(self.L))] +["Qout" + str(self.name)]
@@ -142,20 +138,35 @@ class DQN(object): #Implements Double DQN, with the slow-moving copy of the netw
                 assignment_b = b.assign(weights[index][1])
                 self.sess.run(assignment_k)
                 self.sess.run(assignment_b)
-        
-    def restore(self):
-        print("dqn: restoring")
-    #    self.saver = tf.train.import_meta_graph("./models/main/"+self.name+".meta")
-        self.saver.restore(self.sess,tf.train.latest_checkpoint('./models/main/'))
 
+    def restore(self):
+        names = ["L" + str(n) + str(self.name) for n in range(len(self.L))] +["Qout" + str(self.name)]
+        all_weights = []
+        for index,variable in enumerate(names):
+            w = open("models/"+variable+"_weights.txt","r")
+            b = open("models/"+variable + "_biases.txt","r")
+            weights = eval(w.read())
+            biases = eval(b.read())
+            all_weights.append([weights,biases])
+            w.close()
+            b.close()
+        self.upload_original_network(all_weights)
         self.update_target_network()
-    def save(self):
-        print("dqn: saving")
-        self.saver.save(self.sess,"models/main/" + self.name,write_meta_graph=False)
         
+    def save(self):
+        names = ["L" + str(n) + str(self.name) for n in range(len(self.L))] +["Qout" + str(self.name)]
+        for index,variable in enumerate(names):
+            w = open("models/"+variable+"_weights.txt","w")
+            b = open("models/" +variable + "_biases.txt","w")
+            weights,biases = self.get_weights_and_biases(variable)
+            w.write(str(weights.tolist()))
+            b.write(str(biases.tolist()))
+            w.close()
+            b.close()
+
+
 class SelfActionNN( object):   
     def __init__(self, dim, u, name):
-        
         self.sess = tf.Session()
         self.name = name
 
@@ -183,17 +194,13 @@ class SelfActionNN( object):
         self.loss = tf.losses.softmax_cross_entropy(self.target_action,self.output)
         self.loss_1 = tf.square(self.target_amount-self.amount)
         
-        self.opt = tf.train.RMSPropOptimizer(lrate).minimize(self.loss)
-        self.opt_1 = tf.train.RMSPropOptimizer(lrate).minimize(self.loss_1)
+        self.opt = tf.train.AdamOptimizer(lrate).minimize(self.loss)
+        self.opt_1 = tf.train.AdamOptimizer(lrate).minimize(self.loss_1)
 
-        self.saver = tf.train.Saver()
+        
         self.sess.run(tf.global_variables_initializer())
         
-   #     tf.get_default_graph().finalize()
-
-        
     def update(self,event,player_index): #Uses target Q network.
-#        print("self action: nodes" + str(len([n.name for n in tf.get_default_graph().as_graph_def().node])))
         state_before = event.state0 #states
         state_after = event.state1
         action = event.action
@@ -227,18 +234,44 @@ class SelfActionNN( object):
         elif action_index == 2:
             action = "raise"
             amount = self.sess.run(self.amount,feed_dict = {self.x:[features]}).tolist()[0][0]
-    #        print(amount)
+            print(amount)
         return (action,amount)
 
     def get_weights_and_biases(self,name):
         with tf.variable_scope(name,reuse = True):
             return self.sess.run(tf.get_variable("kernel")), self.sess.run(tf.get_variable("bias"))
 
+    def upload_original_network(self,weights):
+        names =  ["L" + str(n) + str(self.name) for n in range(len(self.L))] +["ActionProbs" + str(self.name)]
+        for index,scope in enumerate(names):
+            with tf.variable_scope(scope,reuse=True):
+                k = tf.get_variable("kernel")
+                b = tf.get_variable("bias")
+                assignment_k = k.assign(weights[index][0])
+                assignment_b = b.assign(weights[index][1])
+                self.sess.run(assignment_k)
+                self.sess.run(assignment_b)
+
     def restore(self):
-        print("self net: restoring")
-     #   self.saver = tf.train.import_meta_graph("./models/self_action/"+self.name+".meta")
-        self.saver.restore(self.sess,tf.train.latest_checkpoint('./models/self_action/'))
+        names = ["L" + str(n) + str(self.name) for n in range(len(self.L))] +["ActionProbs" + str(self.name)]
+        all_weights = []
+        for index,variable in enumerate(names):
+            w = open("models/"+variable+"_weights.txt","r")
+            b = open("models/"+variable + "_biases.txt","r")
+            weights = eval(w.read())
+            biases = eval(b.read())
+            all_weights.append([weights,biases])
+            w.close()
+            b.close()
+        self.upload_original_network(all_weights)
         
     def save(self):
-        print("self net: saving")
-        self.saver.save(self.sess,"models/self_action/" + self.name,write_meta_graph=False)
+        names = ["L" + str(n) + str(self.name) for n in range(len(self.L))] +["ActionProbs" + str(self.name)]
+        for index,variable in enumerate(names):
+            w = open("models/"+variable+"_weights.txt","w")
+            b = open("models/" +variable + "_biases.txt","w")
+            weights,biases = self.get_weights_and_biases(variable)
+            w.write(str(weights.tolist()))
+            b.write(str(biases.tolist()))
+            w.close()
+            b.close()

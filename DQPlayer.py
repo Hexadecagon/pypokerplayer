@@ -5,12 +5,24 @@ from Processing import get_bot_info
 import random
 
 class DQPlayer(BasePokerPlayer):
-  def __init__(self,network,self_network,buffer,bufferSL,number):
+  def __init__(self,network,self_network,buffer,bufferSL,number,starting_parameters=None,verbose=False):
       BasePokerPlayer.__init__(self)
       self.player_index=number
       self.iterations = 0
-      self.epsilon = 0.25
-      self.anticipatory = 0.2
+
+      if starting_parameters == None:
+        self.epsilon = 0.5
+        self.anticipatory = 0.8 
+        self.min_epsilon = 0.05
+        self.update_num = 100
+        self.decay = 0.00025
+      else:
+        self.epsilon = starting_parameters[0]
+        self.anticipatory = starting_parameters[1]
+        self.decay = starting_parameters[2]
+        self.min_epsilon = starting_parameters[3]
+        self.update_num = starting_parameters[4]
+
       
       self.buffer = buffer
       self.bufferSL = bufferSL
@@ -19,6 +31,8 @@ class DQPlayer(BasePokerPlayer):
       self.last_state = None
       self.last_features = None
       self.last_chose_greedy = None
+      
+      self.verbose = verbose
 
       self.network = network
       self.self_network = self_network
@@ -31,24 +45,29 @@ class DQPlayer(BasePokerPlayer):
     return reward
 
   def declare_action(self, valid_actions, hole_card, round_state):
+    verbose = self.verbose
     features = get_bot_info(valid_actions,hole_card,round_state,self.player_index)
     self.run_updates(valid_actions,hole_card,round_state,features)
 
-    print(hole_card)
+    if  verbose:
+      print(hole_card)
+      
     if random.random() < self.anticipatory:
         #choose epsilon-greedy action
-        action = choose_action(valid_actions,hole_card,round_state,self.network,self.epsilon,self.player_index,features)
+        action = choose_action(valid_actions,hole_card,round_state,self.network,self.epsilon,self.player_index,features,verbose)
         self.last_chose_greedy = True
     else:
         action = self.self_network.predict([valid_actions,hole_card,round_state],self.player_index,features)
         self.last_chose_greedy = False
-        print("predicted")
+        if verbose:
+          print("predicted")
         
     #update epsilon,last state, last action
-    self.epsilon =max(0.05,self.epsilon-0.000005)    
+    self.epsilon =max(self.min_epsilon,self.epsilon-self.decay)    
     self.last_state = [valid_actions,hole_card,round_state]
     self.last_action =action
     self.last_features = features
+
     return action
 
   def receive_game_start_message(self, game_info):
@@ -101,5 +120,6 @@ class DQPlayer(BasePokerPlayer):
       
     #periodically update target network
     self.iterations += 1
-    if self.iterations % 100 == 0:
-      self.network.update_target_network()
+    if self.update_num != None:
+      if self.iterations % self.update_num == 0:
+        self.network.update_target_network()

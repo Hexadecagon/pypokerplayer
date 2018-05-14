@@ -26,27 +26,26 @@ sess.run(tf.global_variables_initializer())
 t = 0
 
 
-params = [1,0.7,0.000025,0.1,1000] #epsilon, anticipatory, ,decay,min epsilon, update num
+params = [0,0.8,0.000025,0,None] #epsilon, anticipatory, ,decay,min epsilon, update num
 try:
   dqn_0.restore()
   self_action_NN.restore()
 except FileNotFoundError:
   pass
-except SystemError:
-  pass
 
-player1 = DQPlayer(dqn_0,self_action_NN,bufferRL,bufferSL,0,params,False)
-player2 = DQPlayer(dqn_0,self_action_NN,bufferRL,bufferSL,1,params,False)
+player1 = DQPlayer(dqn_0,self_action_NN,bufferRL,bufferSL,0,params)
+player2 = ConsolePlayer()
+
 for q in range(1000000):
     try:
       config = setup_config(max_round= 100, initial_stack = 100, small_blind_amount = 5)
       config.register_player(name= "Player1", algorithm = player1)
       config.register_player(name="Me", algorithm = player2)
-      game_result = start_poker(config,verbose=0)
+      game_result = start_poker(config,verbose=1)
     except ValueError:
       pass
     print("Epsilon " + str(player1.epsilon))
     print("Iteration " + str(player1.iterations))
-    if q % 10 == 0:
-      dqn_0.save()
-      self_action_NN.save()
+##    if q % 100 == 0:
+##      dqn_0.save()
+##      self_action_NN.save()
