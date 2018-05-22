@@ -6,35 +6,30 @@ import random
 
 from DQPlayer import DQPlayer
 from examples.players.console_player import ConsolePlayer
+from  examples.players.console_player import HonestPlayer
 from examples.players.fish_player import FishPlayer
 from pypokerengine.api.game import setup_config, start_poker
 from pypokerengine.api.emulator import Emulator
 
 
 
-sess = tf.Session()
 
-
-dqn_0 =DQN(124,[1024,1024,1024,1024,1024],"main")
+dqn_0 =DQN(123,[1024,1024,1024],"main")
 self_action_NN = SelfActionNN(123,[512,512,512,512], "self_action")
 
-bufferRL = ReplayBuffer(10000)
-bufferSL = ReplayBuffer(10000)
-
-sess.run(tf.global_variables_initializer())
-
-t = 0
+bufferRL = ReplayBuffer(100000)
+bufferSL = ReplayBuffer(100000)
 
 
-params = [0,0.8,0.000025,0,None] #epsilon, anticipatory, ,decay,min epsilon, update num
+params = [0.1,1,0,0,None] #epsilon, anticipatory, ,decay,min epsilon, update num
 try:
   dqn_0.restore()
   self_action_NN.restore()
 except FileNotFoundError:
-  pass
-
-player1 = DQPlayer(dqn_0,self_action_NN,bufferRL,bufferSL,0,params)
-player2 = ConsolePlayer()
+  print("Error!")
+  
+player1 = DQPlayer(dqn_0,self_action_NN,bufferRL,bufferSL,0,params,True)
+player2 =DQPlayer(dqn_0,self_action_NN,bufferRL,bufferSL,1,params,True)
 
 for q in range(1000000):
     try:
@@ -44,8 +39,4 @@ for q in range(1000000):
       game_result = start_poker(config,verbose=1)
     except ValueError:
       pass
-    print("Epsilon " + str(player1.epsilon))
-    print("Iteration " + str(player1.iterations))
-##    if q % 100 == 0:
-##      dqn_0.save()
-##      self_action_NN.save()
+

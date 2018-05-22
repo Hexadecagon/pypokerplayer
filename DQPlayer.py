@@ -1,27 +1,22 @@
 from DQObjects import Event
 from pypokerengine.players import BasePokerPlayer
-from Choose import choose_action
+from Choose import choose_bayesian
+
 from Processing import get_bot_info
 import random
 
 class DQPlayer(BasePokerPlayer):
-  def __init__(self,network,self_network,buffer,bufferSL,number,starting_parameters=None,verbose=False):
+  def __init__(self,network,self_network,buffer,bufferSL,number,starting_parameters,verbose=False):
       BasePokerPlayer.__init__(self)
       self.player_index=number
       self.iterations = 0
 
-      if starting_parameters == None:
-        self.epsilon = 0.5
-        self.anticipatory = 0.8 
-        self.min_epsilon = 0.05
-        self.update_num = 100
-        self.decay = 0.00025
-      else:
-        self.epsilon = starting_parameters[0]
-        self.anticipatory = starting_parameters[1]
-        self.decay = starting_parameters[2]
-        self.min_epsilon = starting_parameters[3]
-        self.update_num = starting_parameters[4]
+    
+      self.epsilon = starting_parameters[0]
+      self.anticipatory = starting_parameters[1]
+      self.decay = starting_parameters[2]
+      self.min_epsilon = starting_parameters[3]
+      self.update_num = starting_parameters[4]
 
       
       self.buffer = buffer
@@ -38,23 +33,23 @@ class DQPlayer(BasePokerPlayer):
       self.self_network = self_network
 
   def compute_reward(self,round_state):
-
     last_stack = self.last_state[2]["seats"][self.player_index]["stack"] #might not work perfectly. Might need to set maxQ to 0, that would make sense. 
     new_stack = round_state["seats"][self.player_index]["stack"]
     reward = new_stack - last_stack
     return reward
 
   def declare_action(self, valid_actions, hole_card, round_state):
+
     verbose = self.verbose
     features = get_bot_info(valid_actions,hole_card,round_state,self.player_index)
     self.run_updates(valid_actions,hole_card,round_state,features)
 
     if  verbose:
       print(hole_card)
-      
+
     if random.random() < self.anticipatory:
-        #choose epsilon-greedy action
-        action = choose_action(valid_actions,hole_card,round_state,self.network,self.epsilon,self.player_index,features,verbose)
+    #    action = choose_bayesian(valid_actions,hole_card,round_state,self.network,self.epsilon,self.player_index,features,verbose)
+        action = ("raise",9999)
         self.last_chose_greedy = True
     else:
         action = self.self_network.predict([valid_actions,hole_card,round_state],self.player_index,features)
@@ -98,7 +93,7 @@ class DQPlayer(BasePokerPlayer):
     #compute reward since last state
       reward= self.compute_reward(round_state)
 
-      if not valid_actions == None and hole_card == None: #there will be an action this round.
+      if not (valid_actions == None and hole_card == None): #there will be an action this round.
         event = Event(self.last_state, self.last_features,self.last_action, reward,[valid_actions,hole_card,round_state],features,self.player_index)
 
       else: #this is the end.
