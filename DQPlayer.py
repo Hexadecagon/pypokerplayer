@@ -1,4 +1,4 @@
-from DQObjects import Event
+from DQObjectsDueling import Event
 from pypokerengine.players import BasePokerPlayer
 from Choose import choose_bayesian
 

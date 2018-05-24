@@ -1,17 +1,16 @@
 
-from DQObjects import DQN, Event,ReplayBuffer,SelfActionNN
+from DQObjectsDueling import DQN, Event,ReplayBuffer
+from SelfActionNN import SelfActionNN
 import tensorflow as tf
 import pypokerengine
 import random
 
 from DQPlayer import DQPlayer
-from  examples.players.honest_player import HonestPlayer
+from  examples.players.fish_player import FishPlayer
 from  examples.players.random_player import RandomPlayer
 from pypokerengine.api.game import setup_config, start_poker
 
-
-i = 20
-dqn_0 =DQN(123,[1024,1024,1024,1024],"main")
+dqn_0 =DQN(123,[1024,1024,1024],[1024,1024,1024],"main")
 self_action_NN = SelfActionNN(123,[512,512,512,512], "self_action")
 
 bufferRL = ReplayBuffer(10000)
@@ -25,7 +24,7 @@ except FileNotFoundError:
   print("Error!")
   
 player1 = DQPlayer(dqn_0,self_action_NN,bufferRL,bufferSL,0,params,True)
-player2 =RandomPlayer()#HonestPlayer()
+player2 =FishPlayer()#HonestPlayer()
 
 def run_simulation(i,player1,player2):
 

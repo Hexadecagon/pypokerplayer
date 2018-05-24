@@ -82,7 +82,7 @@ class DQN(object): #Implements Double DQN, with the slow-moving copy of the netw
         self.Tadvantage_function = tf.layers.dense(inputs = self.TA[len(self.TA)-1],units=27,name= "TAdvantage"+str(name))        
         
         self.Qout = self.value_function + self.advantage_function - tf.reduce_mean(self.advantage_function) #fold, call/check, raise to n
-        self.TQout = self.Tvalue_function + self.Tadvantage_function 
+        self.TQout = self.Tvalue_function + self.Tadvantage_function  -tf.reduce_mean(self.Tadvantage_function)
 
         self.saver = tf.train.Saver()
         self.target_Q = tf.placeholder(tf.float32)
@@ -95,14 +95,15 @@ class DQN(object): #Implements Double DQN, with the slow-moving copy of the netw
         self.update_target_network()
 
     def update(self,event,gamma,after_network): #Uses target Q network.
-
+        
         state_before = event.state0 #states
         state_after = event.state1
         player_index = event.player_index
         action = event.action
 
         features = event.features0
-
+#        print(self.sess.run(self.value_function, feed_dict={self.x:[features]}).tolist()[0])
+#        print( self.sess.run(self.advantage_function, feed_dict={self.x:[features]}).tolist()[0])
         normal_Qs = self.sess.run(self.Qout, feed_dict={self.x:[features]}).tolist()[0]#Calculate Qvalues of state 0
                                   
         if(state_after != None):
