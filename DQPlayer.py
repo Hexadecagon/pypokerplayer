@@ -48,8 +48,7 @@ class DQPlayer(BasePokerPlayer):
       print(hole_card)
 
     if random.random() < self.anticipatory:
-    #    action = choose_bayesian(valid_actions,hole_card,round_state,self.network,self.epsilon,self.player_index,features,verbose)
-        action = ("raise",9999)
+        action = choose_bayesian(valid_actions,hole_card,round_state,self.network,self.epsilon,self.player_index,features,verbose)
         self.last_chose_greedy = True
     else:
         action = self.self_network.predict([valid_actions,hole_card,round_state],self.player_index,features)

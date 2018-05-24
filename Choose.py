@@ -1,7 +1,7 @@
 import random
 import math
 import numpy as np
-from Raise_Sizes import generate_raise_size
+from Raise_Sizes import generate_raise_size,sizes
 from Optimal_Raise_Qvalues import optimal_raise_Qvalues
 
 def softmax_new(x,t):
@@ -11,39 +11,14 @@ def softmax_new(x,t):
         if index == 0 or index == 1:
             new_nums.append(math.exp(num/t))
         else:
-            new_nums.append(math.exp(num/t)/(len(x)-2))
+            if index-1 < len(sizes):
+                jump =sizes[index-1] -sizes[index-2]
+            else:
+                jump = 0.08
+            new_nums.append(math.exp(num/t)*jump*2)
+    
     s = sum(new_nums)
     return [n/s for n in new_nums]
-
-##def choose_action(valid_actions,hole_card,round_state,network, epsilon,player_index,features = None,verbose = False): doesn't work properly lol
-##    if random.random() > epsilon:
-##        Qvalues,raise_size =optimal_raise_Qvalues(valid_actions,hole_card,round_state,network,player_index,"original",features)
-##        
-##        if  verbose:
-##            print(Qvalues,raise_size)
-##        max_Q = max(Qvalues)
-##            
-##        if Qvalues.index(max_Q) == 0:
-##            if valid_actions[1]["amount"] == 0:
-##                return "call", 0 
-##            return "fold", 0
-##        elif Qvalues.index(max_Q) == 1:
-##            return "call", valid_actions[1]["amount"]
-##        elif Qvalues.index(max_Q) >= 2:
-##            return "raise", raise_size
-##    else: #choose a random action.
-##        if  verbose:
-##            print("random")
-##        new_random = random.random()
-##        if new_random < 0.25:
-##            return "fold",0
-##        elif new_random< 0.50:
-##            return  "call", valid_actions[1]["amount"]
-##        else:
-##            if valid_actions[2]["amount"]["min"] == -1:
-##                return  "call", valid_actions[1]["amount"]
-##            return "raise", random.uniform(valid_actions[2]["amount"]["min"], valid_actions[2]["amount"]["max"])
-
 
 def choose_bayesian(valid_actions,hole_card,round_state,network,epsilon,player_index,features=None,verbose=False):
     Qvalues,raise_size = optimal_raise_Qvalues(valid_actions,hole_card,round_state,network,player_index,"original",features)
